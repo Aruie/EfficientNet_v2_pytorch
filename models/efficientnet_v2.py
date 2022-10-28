@@ -1,6 +1,5 @@
 
 
-from email.policy import strict
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -187,3 +186,8 @@ if __name__ == '__main__':
     # print(model)
 
     print(summary(model, ( 3, 224, 224), device = 'cpu'))
+
+
+
+
+
