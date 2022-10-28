@@ -63,6 +63,7 @@ class EfficientNetV2(nn.Module):
         x = self.fc(x)
         return x
 
+# Traditional MBConv Block
 class MBConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, expansion_ratio, kernel_size, stride):
         super().__init__()
@@ -106,12 +107,10 @@ class MBConvBlock(nn.Module):
         out = F.silu(out)
         return out
 
+# Fused MB Convolution Block
 class FusedMBConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, expansion_ratio, kernel_size, stride):
         super().__init__()
-
-
-
 
         block_dict = OrderedDict()
 
