@@ -1,5 +1,6 @@
 
 
+from email.policy import strict
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -24,12 +25,14 @@ class EfficientNetV2(nn.Module):
         block_dict = OrderedDict()
 
         # Layer Info : [conv_type, layers, in_channels, out_channels, expansion_ratio, kernel_size, stride]
-        for stage, info in enumerate(kwargs['layers_info']) :
+        for stage, info in enumerate(kwargs['layers_info'], 1) :
             ConvBlock = FusedMBConvBlock if info[0] == 'FusedMBConv' else MBConvBlock
 
             # Repeat Layers
-            for i in range(info[1]):
-                block_dict[f'stage_{stage}_{i:02d}'] = ConvBlock(*info[2:])
+            for i in range(1, info[1]+1):
+                # Stride, inchannels apply to the first layer of each stage
+                stride, in_channels = (info[6], info[2]) if i == 1 else (1, info[3])
+                block_dict[f'stage_{stage}_{i:02d}'] = ConvBlock(in_channels, *info[3:-1], stride)
 
         # Fused MBConv Blocks
         self.blocks = nn.Sequential(block_dict)
@@ -68,7 +71,7 @@ class MBConvBlock(nn.Module):
 
         # Expansion Convolution
         hidden_channels = in_channels * expansion_ratio
-        block_dict['conv_1'] = nn.Conv2d(in_channels, hidden_channels, kernel_size, bias=False)
+        block_dict['conv_1'] = nn.Conv2d(in_channels, hidden_channels, kernel_size=1, bias=False)
         block_dict['bn_1'] = nn.BatchNorm2d(hidden_channels)
         block_dict['act_1'] = nn.SiLU()
 
@@ -81,7 +84,7 @@ class MBConvBlock(nn.Module):
         block_dict['se'] = SEBlock(hidden_channels)
 
         # Projection Convolution
-        block_dict['conv_3'] = nn.Conv2d(in_channels * expansion_ratio, out_channels, kernel_size, bias=False)
+        block_dict['conv_3'] = nn.Conv2d(hidden_channels, out_channels, kernel_size=1, bias=False)
         block_dict['bn_3'] = nn.BatchNorm2d(out_channels)
 
 
@@ -107,6 +110,9 @@ class FusedMBConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, expansion_ratio, kernel_size, stride):
         super().__init__()
 
+
+
+
         block_dict = OrderedDict()
 
         # Fused Convolutions
@@ -119,8 +125,8 @@ class FusedMBConvBlock(nn.Module):
         block_dict['se'] = SEBlock(hidden_channels)
 
         # Projection Convolution
-        block_dict['conv_3'] = nn.Conv2d(in_channels * expansion_ratio, out_channels, kernel_size, bias=False)
-        block_dict['bn_3'] = nn.BatchNorm2d(out_channels)
+        block_dict['conv_2'] = nn.Conv2d(hidden_channels, out_channels, kernel_size=1, bias=False)
+        block_dict['bn_2'] = nn.BatchNorm2d(out_channels)
 
         # Make Block
         self.block = nn.Sequential(block_dict)
@@ -153,7 +159,6 @@ class SEBlock(nn.Module):
             nn.Linear(in_channels, in_channels // 4),
             nn.SiLU(),
             nn.Linear(in_channels // 4, in_channels),
-            nn.SoFTmax()
             nn.Sigmoid()
         )
 
@@ -167,6 +172,8 @@ class SEBlock(nn.Module):
 
 if __name__ == '__main__':
     
+    from torchsummary import summary
+
     efficientnetv2_s = [
         # [conv_type,       layers, in_channels,    out_channels,   expansion_ratio,    kernel_size,    stride]
         ['FusedMBConv',     2,      24,             24,             1,                  3,              1],
@@ -177,5 +184,7 @@ if __name__ == '__main__':
         ['MBConv',          15,     160,            256,            6,                  3,              2],
     ]
 
-    model = EfficientNetV2()
-    print(model)
+    model = EfficientNetV2(layers_info = efficientnetv2_s, num_classes = 10)
+    # print(model)
+
+    print(summary(model, ( 3, 224, 224), device = 'cpu'))
