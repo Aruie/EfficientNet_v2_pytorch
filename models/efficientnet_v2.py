@@ -168,6 +168,24 @@ class SEBlock(nn.Module):
         out = x * out
         return out
 
+
+
+def make_efficientnetv2(model_type:str, num_classes:int):
+    if model_type == 's':
+        efficientnetv2_s = [
+            # [conv_type,       layers, in_channels,    out_channels,   expansion_ratio,    kernel_size,    stride]
+            ['FusedMBConv',     2,      24,             24,             1,                  3,              1],
+            ['FusedMBConv',     4,      24,             48,             4,                  3,              2],
+            ['FusedMBConv',     4,      48,             64,             4,                  3,              2],
+            ['MBConv',          6,      64,             128,            4,                  3,              2],
+            ['MBConv',          9,      128,            160,            6,                  3,              1],
+            ['MBConv',          15,     160,            256,            6,                  3,              2],
+        ]
+    else :
+        raise NotImplementedError('EfficientNetV2-{} is not implemented.'.format(model_type))
+    return EfficientNetV2(layers_info = efficientnetv2_s, num_classes = num_classes)
+
+
 if __name__ == '__main__':
     
     from torchsummary import summary

@@ -1,1 +1,2 @@
 from .efficientnet_v2 import EfficientNetV2
+from .efficientnet_v2 import make_efficientnetv2
