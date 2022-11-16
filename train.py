@@ -10,21 +10,24 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.data import random_split
 from torchvision.datasets import MNIST, CIFAR10, CIFAR100
 from torchvision import transforms
-import torch.functional as F
+import torch.nn.functional as F
 
 
 # %%
 
 class CIFARDataModule(pl.LightningDataModule):
-    def __init__(self, data_class: str, data_dir: str = "./data"):
+    def __init__(self, data_class: str, batch_size = 512, data_dir: str = "./data"):
         super().__init__()
         self.data_dir = data_dir
         self.data_class = CIFAR10 if data_class == '10' else CIFAR100 if data_class == '100' else None
+        self.batch_size = batch_size
+
         if self.data_class is None:
             raise ValueError('data_class must be 10 or 100')
         self.transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307, 0.1307, 0.1307), (0.3081, 0.3081, 0.3081))])
+        
 
     def prepare_data(self):
         self.data_class(self.data_dir, train=True, download=True)
@@ -66,9 +69,7 @@ class CIFARDataModule(pl.LightningDataModule):
 
 
 
-
-
-# 학습
+#%%
 class TrainModule(pl.LightningModule):
     def __init__(self, model, lr=1e-3):
         super().__init__()
@@ -111,14 +112,25 @@ if __name__ == '__main__':
 
     cifar = CIFARDataModule(data_class='10')
     model = make_efficientnetv2('s', num_classes=10)
+    
     # %%
 
-    train_module = TrainModule(model=model, lr=1e-3)
-    # %%
+    logger = TensorBoardLogger('tb_logs', name='efficientnetv2-s')
+    checkpoint_callback = ModelCheckpoint(
+        monitor='val_loss',
+        dirpath='checkpoints',
+        filename='efficientnetv2-s-{epoch:02d}-{val_loss:.2f}',
+        save_top_k=3,
+        mode='min',
+    )
 
-    trainer = Trainer(gpus=0, max_epochs=10)
+    trainer = Trainer(
+        gpus=1,
+        max_epochs=100,
+        logger=logger,
+        callbacks=[checkpoint_callback],
+        # fast_dev_run=True,
+    )
 
-    # %%
+    train_module = TrainModule(model, lr=1e-3)
     trainer.fit(train_module, cifar)
-    # %%
-    trainer.test(train_module, cifar)

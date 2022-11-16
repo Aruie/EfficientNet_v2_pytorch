@@ -1,3 +1,8 @@
 venv/
 data/
 */__pycache__/
+.vscode/
+tb_logs/
+*.ipynb
+*.ipynb_checkpoints/
+checkpoints
