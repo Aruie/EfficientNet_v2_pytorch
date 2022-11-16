@@ -16,12 +16,12 @@ import torch.nn.functional as F
 # %%
 
 class CIFARDataModule(pl.LightningDataModule):
-    def __init__(self, data_class: str, batch_size = 512, data_dir: str = "./data"):
+    def __init__(self, data_class: str, batch_size = 1024, data_dir: str = "./data"):
         super().__init__()
         self.data_dir = data_dir
         self.data_class = CIFAR10 if data_class == '10' else CIFAR100 if data_class == '100' else None
         self.batch_size = batch_size
-
+        
         if self.data_class is None:
             raise ValueError('data_class must be 10 or 100')
         self.transform = transforms.Compose([
@@ -84,6 +84,11 @@ class TrainModule(pl.LightningModule):
         y_hat = self(x)
         loss = F.cross_entropy(y_hat, y)
         self.log('train_loss', loss)
+
+        preds = torch.argmax(y_hat, dim=1)
+        acc = torch.sum(preds == y).item() / len(y)
+        self.log('train_acc', acc)
+
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -92,11 +97,21 @@ class TrainModule(pl.LightningModule):
         loss = F.cross_entropy(y_hat, y)
         self.log('val_loss', loss)
 
+        preds = torch.argmax(y_hat, dim=1)
+        acc = torch.sum(preds == y).item() / len(y)
+        self.log('val_acc', acc)
+        
+
     def test_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x)
         loss = F.cross_entropy(y_hat, y)
         self.log('test_loss', loss)
+
+        preds = torch.argmax(y_hat, dim=1)
+        acc = torch.sum(preds == y).item() / len(y)
+        self.log('test_acc', acc)
+
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
@@ -107,13 +122,10 @@ class TrainModule(pl.LightningModule):
 
 from models import make_efficientnetv2
 
-
 if __name__ == '__main__':
 
     cifar = CIFARDataModule(data_class='10')
     model = make_efficientnetv2('s', num_classes=10)
-    
-    # %%
 
     logger = TensorBoardLogger('tb_logs', name='efficientnetv2-s')
     checkpoint_callback = ModelCheckpoint(
@@ -132,5 +144,17 @@ if __name__ == '__main__':
         # fast_dev_run=True,
     )
 
-    train_module = TrainModule(model, lr=1e-3)
+    train_module = TrainModule(model)
     trainer.fit(train_module, cifar)
+    
+    # %%
+
+    train_module = TrainModule(model=model, lr=1e-3)
+    # %%
+
+    trainer = Trainer(gpus=0, max_epochs=10)
+
+    # %%
+    trainer.fit(train_module, cifar)
+    # %%
+    trainer.test(train_module, cifar)
