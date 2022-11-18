@@ -15,11 +15,11 @@ import torch.nn.functional as F
 
 from torch.optim import RMSprop
 
-
+from models import make_efficientnetv2
 
 # %%
 class CIFARDataModule(pl.LightningDataModule):
-    def __init__(self, data_class: str, batch_size = 1024, data_dir: str = "./data"):
+    def __init__(self, data_class: str, batch_size = 512, data_dir: str = "./data"):
         super().__init__()
         self.data_dir = data_dir
         self.data_class = CIFAR10 if data_class == '10' else CIFAR100 if data_class == '100' else None
@@ -27,10 +27,11 @@ class CIFARDataModule(pl.LightningDataModule):
         
         if self.data_class is None:
             raise ValueError('data_class must be 10 or 100')
+            
         self.transform = transforms.Compose([
+            transforms.RandAugment(magnitude = 5),
             transforms.ToTensor(),
             transforms.Normalize((0.1307, 0.1307, 0.1307), (0.3081, 0.3081, 0.3081)),
-            transforms.RandAugment(magnitude = 5),
         ])
         
 
@@ -120,7 +121,7 @@ class TrainModule(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        return RMSprop(self.parameters(), lr=self.lr, alpha=0.99, eps=1e-08, weight_decay=0.9, momentum=0.9, centered=False)
+        return RMSprop(self.parameters(), lr=self.lr, alpha=0.99, eps=1e-8, centered=False)
 
     # warmup
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure, on_tpu=False, using_native_amp=False, using_lbfgs=False):
@@ -140,23 +141,25 @@ class TrainModule(pl.LightningModule):
 
 #%%
 
-from models import make_efficientnetv2
+
 
 if __name__ == '__main__':
 
     
-    
     args = {
         'data' : '100',
-        'warmup' : 10,
+        'warmup' : 0,
         'epoch' : 50,
+        'lr' : 1e-3,
+        'batch_size' : 1024,
         'dropout_rate' : 0.1,
+        'randaug_magnitude' : 5
     }
     
     name = f'ENv2-s CIFAR{args["data"]}'
     
     for k, v in args.items():
-        if k == 'data' : 
+        if k in  ['data', 'epoch'] : 
             continue
             
         if v :
@@ -168,7 +171,7 @@ if __name__ == '__main__':
     print(name)
     
     
-    cifar = CIFARDataModule(data_class=args['data'])
+    cifar = CIFARDataModule(data_class=args['data'], batch_size = args['batch_size'])
     model = make_efficientnetv2('s', num_classes=int(args['data']), dropout_rate=args['dropout_rate'])
 
 
@@ -181,7 +184,7 @@ if __name__ == '__main__':
         logger=logger,
     )
 
-    train_module = TrainModule(model, warmup=args['warmup'])
+    train_module = TrainModule(model, lr = args['lr'], warmup=args['warmup'] )
     trainer.fit(train_module, cifar)
     
     trainer.test(train_module, cifar)
