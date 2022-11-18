@@ -5,6 +5,7 @@ from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
+
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data import random_split
@@ -13,9 +14,6 @@ from torchvision import transforms
 import torch.nn.functional as F
 
 from torch.optim import RMSprop
-
-
-
 
 
 
@@ -83,7 +81,7 @@ class TrainModule(pl.LightningModule):
         self.model = model
         self.lr = lr
         self.warmup = warmup
-
+        
 
     def forward(self, x):
         return self.model(x)
@@ -122,7 +120,7 @@ class TrainModule(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        return torch.optim.RMSprop(self.parameters(), lr=self.lr, alpha=0.99, eps=1e-08, weight_decay=0.9, momentum=0.9, centered=False)
+        return RMSprop(self.parameters(), lr=self.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0.9, centered=False)
 
     # warmup
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure, on_tpu=False, using_native_amp=False, using_lbfgs=False):
@@ -151,7 +149,8 @@ if __name__ == '__main__':
     args = {
         'data' : '100',
         'warmup' : True,
-        'epoch' : 50
+        'epoch' : 50,
+        'dropout_rate' : 0.1,
     }
     
     name = f'ENv2-s CIFAR{args["data"]}'
@@ -170,7 +169,7 @@ if __name__ == '__main__':
     
     
     cifar = CIFARDataModule(data_class=args['data'])
-    model = make_efficientnetv2('s', num_classes=int(args['data']))
+    model = make_efficientnetv2('s', num_classes=int(args['data']), dropout_rate=args['dropout_rate'])
 
 
     logger = TensorBoardLogger('tb_logs', name=name)
