@@ -15,6 +15,14 @@ class EfficientNetV2(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
 
+        # Add dropout
+        if kwargs.get('dropout_rate') > 0:
+            self.dropout = nn.Dropout(kwargs.get('dropout_rate'))
+        else:
+            self.dropout = None
+
+        
+
         # First Convolution
         self.conv1 = nn.Conv2d(3, 24, kernel_size=3, stride=2, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(24)
@@ -58,6 +66,10 @@ class EfficientNetV2(nn.Module):
         x = self.act2(x)
 
         x = self.avgpool(x)
+        
+        if self.dropout:
+            x = self.dropout(x)
+
         x = torch.flatten(x, 1)
         x = self.fc(x)
         return x
@@ -170,7 +182,7 @@ class SEBlock(nn.Module):
 
 
 
-def make_efficientnetv2(model_type:str, num_classes:int):
+def make_efficientnetv2(model_type:str, num_classes:int, dropout_rate = 0):
     if model_type == 's':
         efficientnetv2_s = [
             # [conv_type,       layers, in_channels,    out_channels,   expansion_ratio,    kernel_size,    stride]
@@ -183,7 +195,7 @@ def make_efficientnetv2(model_type:str, num_classes:int):
         ]
     else :
         raise NotImplementedError('EfficientNetV2-{} is not implemented.'.format(model_type))
-    return EfficientNetV2(layers_info = efficientnetv2_s, num_classes = num_classes)
+    return EfficientNetV2(layers_info = efficientnetv2_s, num_classes = num_classes, dropout_rate = dropout_rate)
 
 
 if __name__ == '__main__':

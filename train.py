@@ -5,6 +5,7 @@ from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
+
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data import random_split
@@ -12,7 +13,7 @@ from torchvision.datasets import MNIST, CIFAR10, CIFAR100
 from torchvision import transforms
 import torch.nn.functional as F
 
-from torch.optim.optimizer import RMSprop, Adam
+from torch.optim import RMSprop, Adam
 
 
 
@@ -78,7 +79,7 @@ class TrainModule(pl.LightningModule):
         self.model = model
         self.lr = lr
         self.warmup = warmup
-
+        
 
     def forward(self, x):
         return self.model(x)
@@ -117,8 +118,7 @@ class TrainModule(pl.LightningModule):
 
 
     def configure_optimizers(self):
-#         return torch.optim.Adam(self.parameters(), lr=self.lr)
-        return torch.optim.RMSprop(self.parameters(), lr=self.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0.9, centered=False)
+        return RMSprop(self.parameters(), lr=self.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0.9, centered=False)
 
     # warmup
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure, on_tpu=False, using_native_amp=False, using_lbfgs=False):
@@ -147,30 +147,36 @@ if __name__ == '__main__':
     args = {
         'data' : '100',
         'warmup' : True,
+        'epoch' : 50,
+        'dropout_rate' : 0.1,
     }
     
+    name = f'ENv2-s CIFAR{args["data"]}'
+    
+    for k, v in args.items():
+        if k == 'data' : 
+            continue
+            
+        if v :
+            if v is True :
+                name = name + ' ' + k
+            else :
+                name = name + ' ' + f'{k}={v}'
+    
+    print(name)
     
     
     cifar = CIFARDataModule(data_class=args['data'])
-    model = make_efficientnetv2('s', num_classes=int(args['data']))
+    model = make_efficientnetv2('s', num_classes=int(args['data']), dropout_rate=args['dropout_rate'])
 
-    name = f'efficientnetv2-s CIFAR{args["data"]}'
+
     logger = TensorBoardLogger('tb_logs', name=name)
-    
-#     checkpoint_callback = ModelCheckpoint(
-#         monitor='val_loss',
-#         dirpath='checkpoints',
-#         filename='efficientnetv2-s-{epoch:02d}-{val_loss:.2f}',
-#         save_top_k=1,
-#         mode='min',
-#     )
+
 
     trainer = Trainer(
         gpus=1,
-        max_epochs=10,
+        max_epochs=args['epoch'],
         logger=logger,
-#         callbacks=[checkpoint_callback],
-        # fast_dev_run=True,
     )
 
     train_module = TrainModule(model, warmup=args['warmup'])
