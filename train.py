@@ -28,9 +28,9 @@ class CIFARDataModule(pl.LightningDataModule):
         if self.data_class is None:
             raise ValueError('data_class must be 10 or 100')
         self.transform = transforms.Compose([
+            transforms.RandAugment(magnitude = 5),
             transforms.ToTensor(),
             transforms.Normalize((0.1307, 0.1307, 0.1307), (0.3081, 0.3081, 0.3081)),
-            transforms.RandAugment(magnitude = 5),
         ])
         
 
@@ -120,14 +120,14 @@ class TrainModule(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        return RMSprop(self.parameters(), lr=self.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0.9, centered=False)
+        return RMSprop(self.parameters(), lr=self.lr, alpha=0.99, eps=1e-3, weight_decay=0.9, momentum=0.9, centered=False)
 
     # warmup
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure, on_tpu=False, using_native_amp=False, using_lbfgs=False):
         # warm up lr
         if self.warmup:
-            if self.trainer.global_step < 500:
-                lr_scale = min(1., float(self.trainer.global_step + 1) / 500.)
+            if self.trainer.global_step < self.warmup:
+                lr_scale = min(1., float(self.trainer.global_step + 1) / self.warmup)
                 for pg in optimizer.param_groups:
                     pg['lr'] = lr_scale * self.lr
         # update params
@@ -148,7 +148,7 @@ if __name__ == '__main__':
     
     args = {
         'data' : '100',
-        'warmup' : True,
+        'warmup' : 0,
         'epoch' : 50,
         'dropout_rate' : 0.1,
     }
