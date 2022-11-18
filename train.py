@@ -148,7 +148,7 @@ if __name__ == '__main__':
     
     args = {
         'data' : '100',
-        'warmup' : 0,
+        'warmup' : 10,
         'epoch' : 50,
         'dropout_rate' : 0.1,
     }
