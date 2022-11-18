@@ -112,8 +112,7 @@ class TrainModule(pl.LightningModule):
 
 
     def configure_optimizers(self):
-#         return torch.optim.Adam(self.parameters(), lr=self.lr)
-        return torch.optim.RMSProp(self.parameters(), lr=self.lr)
+        return torch.optim.RMSprop(self.parameters(), lr=self.lr, alpha=0.99, weight_decay=1e-5, momentum=0.1, centered=False)
 
 
 
@@ -129,31 +128,21 @@ if __name__ == '__main__':
         'data' : '100',
     }
     
-    
-    
     cifar = CIFARDataModule(data_class=config['data'])
     model = make_efficientnetv2('s', num_classes=int(config['data']))
 
     name = f'efficientnetv2-s CIFAR{config["data"]}'
     logger = TensorBoardLogger('tb_logs', name=name)
     
-#     checkpoint_callback = ModelCheckpoint(
-#         monitor='val_loss',
-#         dirpath='checkpoints',
-#         filename='efficientnetv2-s-{epoch:02d}-{val_loss:.2f}',
-#         save_top_k=1,
-#         mode='min',
-#     )
 
     trainer = Trainer(
         gpus=1,
-        max_epochs=10,
+        max_epochs=20,
         logger=logger,
-#         callbacks=[checkpoint_callback],
-        # fast_dev_run=True,
     )
 
     train_module = TrainModule(model)
+    
     trainer.fit(train_module, cifar)
     
     trainer.test(train_module, cifar)
