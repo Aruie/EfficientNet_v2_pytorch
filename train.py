@@ -12,7 +12,10 @@ from torchvision.datasets import MNIST, CIFAR10, CIFAR100
 from torchvision import transforms
 import torch.nn.functional as F
 
-from torch.optim.optimizer import RMSprop, Adam
+from torch.optim import RMSprop
+
+
+
 
 
 
@@ -28,7 +31,9 @@ class CIFARDataModule(pl.LightningDataModule):
             raise ValueError('data_class must be 10 or 100')
         self.transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize((0.1307, 0.1307, 0.1307), (0.3081, 0.3081, 0.3081))])
+            transforms.Normalize((0.1307, 0.1307, 0.1307), (0.3081, 0.3081, 0.3081)),
+            transforms.RandAugment(magnitude = 5),
+        ])
         
 
     def prepare_data(self):
@@ -117,8 +122,7 @@ class TrainModule(pl.LightningModule):
 
 
     def configure_optimizers(self):
-#         return torch.optim.Adam(self.parameters(), lr=self.lr)
-        return torch.optim.RMSprop(self.parameters(), lr=self.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0.9, centered=False)
+        return torch.optim.RMSprop(self.parameters(), lr=self.lr, alpha=0.99, eps=1e-08, weight_decay=0.9, momentum=0.9, centered=False)
 
     # warmup
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure, on_tpu=False, using_native_amp=False, using_lbfgs=False):
@@ -132,7 +136,7 @@ class TrainModule(pl.LightningModule):
         optimizer.step(closure=optimizer_closure)
         # update lr
         optimizer.zero_grad()
-        self.lr_scheduler.step()
+#         self.lr_scheduler.step()
 
 
 
@@ -147,20 +151,34 @@ if __name__ == '__main__':
     args = {
         'data' : '100',
         'warmup' : True,
+        'epoch' : 50
     }
     
+    name = f'ENv2-s CIFAR{args["data"]}'
+    
+    for k, v in args.items():
+        if k == 'data' : 
+            continue
+            
+        if v :
+            if v is True :
+                name = name + ' ' + k
+            else :
+                name = name + ' ' + f'{k}={v}'
+    
+    print(name)
     
     
     cifar = CIFARDataModule(data_class=args['data'])
     model = make_efficientnetv2('s', num_classes=int(args['data']))
 
-    name = f'efficientnetv2-s CIFAR{args["data"]}'
+
     logger = TensorBoardLogger('tb_logs', name=name)
 
 
     trainer = Trainer(
         gpus=1,
-        max_epochs=10,
+        max_epochs=args['epoch'],
         logger=logger,
     )
 
