@@ -13,3 +13,7 @@
 # train.py 구현
 - 아직 argparser 는 구현안됨
 - config 활용
+
+```
+!python train.py -e 1 -b 512 --data CIFAR10 --lr 0.001 --rand_mag 5 --warmup 10 --dropout 0.2 --decay 0.1 
+```
