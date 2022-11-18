@@ -23,7 +23,7 @@ from models import make_efficientnetv2
 
 # %%
 class CIFARDataModule(pl.LightningDataModule):
-    def __init__(self, data: str, batch_size = 512, data_dir: str = "./data"):
+    def __init__(self, data: str, batch_size, randaug_magnitude, data_dir: str = "./data"):
         super().__init__()
         self.data_dir = data_dir
         self.data_class = CIFAR10 if data == 'CIFAR10' else CIFAR100 if data == 'CIFAR100' else None
@@ -33,7 +33,7 @@ class CIFARDataModule(pl.LightningDataModule):
             raise ValueError(f'Invalid Data {data}')
             
         self.transform = transforms.Compose([
-            transforms.RandAugment(magnitude = 5),
+            transforms.RandAugment(magnitude = randaug_magnitude),
             transforms.ToTensor(),
             transforms.Normalize((0.1307, 0.1307, 0.1307), (0.3081, 0.3081, 0.3081)),
         ])
@@ -81,16 +81,18 @@ class CIFARDataModule(pl.LightningDataModule):
 
 #%%
 class TrainModule(pl.LightningModule):
-    # def __init__(self, model_type = 's', lr=1e-3, warmup = False, **kwargs):
     def __init__(self, **kwargs):
         super().__init__()
         self.save_hyperparameters()
+        print('----------------------------------------')
+        print('--- Hyper Parameters -------------------')
+        print('----------------------------------------')
         print(self.hparams)
+        print('----------------------------------------')
+
         num_classes = 10 if self.hparams['data'] == 'CIFAR10' else 100 if self.hparams['data'] == 'CIFAR100' else None
         if num_classes is None:
             raise ValueError('data_class must be 10 or 100')
-
-        # self.model = make_efficientnetv2('s', num_classes=int(args['data']), dropout_rate=args['dropout_rate'])
         self.model = make_efficientnetv2('s', num_classes=num_classes, dropout_rate=self.hparams['dropout_rate'])
 
         self.lr = self.hparams['lr']
@@ -134,8 +136,7 @@ class TrainModule(pl.LightningModule):
 
 
     def configure_optimizers(self):
-#         return RMSprop(self.parameters(), lr=self.lr)
-        return Adam(self.parameters(), lr=self.lr)
+        return Adam(self.parameters(), lr=self.lr, weight_decay=self.hparams['weight_decay'])
 
     # warmup
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure, on_tpu=False, using_native_amp=False, using_lbfgs=False):
@@ -158,7 +159,8 @@ class TrainModule(pl.LightningModule):
         parser.add_argument('--data', type=str, default='CIFAR10', help='CIFAR10 or CIFAR100')
         parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
         parser.add_argument('--warmup', type=int, default=0, help='warmup steps')
-        parser.add_argument('--dropout_rate', type=float, default=0.2, help='dropout rate')
+        parser.add_argument('--dropout', dest = 'dropout_rate', type=float, default=0.1)
+        parser.add_argument('--decay', dest = 'weight_decay', type=float, default=0.0)
         return parent_parser
 
 
@@ -169,42 +171,31 @@ class TrainModule(pl.LightningModule):
 
 if __name__ == '__main__':
 
-
-    args = {
-        'data' : '100',
-        'warmup' : 0,
-        'epoch' : 50,
-        'lr' : 1e-3,
-        'batch_size' : 1024,
-        'dropout_rate' : 0.1,
-        'randaug_magnitude' : 5
-    }
     
     parser = ArgumentParser()
-    parser.add_argument('-e','--epoch', type=int, default=10, help='number of epochs')
-    parser.add_argument('-b','--batch_size', type=int, default=1024, help='batch size')
-    parser.add_argument('--randaug_magnitude', type=int, default=5, help='RandAug magnitude')
+    parser.add_argument('-e', dest='epoch', type=int, default=10, help='number of epochs')
+    parser.add_argument('-b', dest='batch_size', type=int, default=1024, help='batch size')
+    parser.add_argument('--rand_mag', dest = 'randaug_magnitude', type=int, default=5, help='RandAug magnitude')
 
     parser = TrainModule.add_model_specific_args(parser)
-    # parser = pl.Trainer.add_argparse_args(parser)
     args = parser.parse_args()
 
-    name = 'tmp'
-    # name = f'ENv2-s CIFAR{args["data"]}'
-    # for k, v in args.items():
-    #     if k in  ['data', 'epoch'] : 
-    #         continue
-    #     if v :
-    #         if v is True :
-    #             name = name + ' ' + k
-    #         else :
-    #             name = name + ' ' + f'{k}={v}'
+    
+    dict_args = vars(args)
+
+    name = f'ENv2-s {dict_args["data"]}'
+    for k, v in dict_args.items():
+        if k in  ['data', 'epoch'] : 
+            continue
+        if v :
+            if v is True :
+                name = name + ' ' + k
+            else :
+                name = name + ' ' + f'{k}={v}'
     
     print(name)
-    dict_args = vars(args)
     
-    # cifar = CIFARDataModule(data_class=args['data'], batch_size = args['batch_size'])
-    cifar = CIFARDataModule(data=dict_args['data'], batch_size = dict_args['batch_size'])
+    cifar = CIFARDataModule(data=dict_args['data'], batch_size = dict_args['batch_size'], randaug_magnitude=dict_args['randaug_magnitude'])
 
     logger = TensorBoardLogger('tb_logs', name=name)
     trainer = Trainer(
@@ -214,8 +205,6 @@ if __name__ == '__main__':
         logger=logger,
     )
 
-    
-    # train_module = TrainModule(lr = args['lr'], warmup=args['warmup'] )
     train_module = TrainModule(**dict_args)
 
     trainer.fit(train_module, cifar)
