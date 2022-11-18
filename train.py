@@ -13,7 +13,7 @@ from torchvision.datasets import MNIST, CIFAR10, CIFAR100
 from torchvision import transforms
 import torch.nn.functional as F
 
-from torch.optim import RMSprop
+from torch.optim import RMSprop, Adam
 
 from models import make_efficientnetv2
 
@@ -121,7 +121,8 @@ class TrainModule(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        return RMSprop(self.parameters(), lr=self.lr, alpha=0.99, eps=1e-8, centered=False)
+#         return RMSprop(self.parameters(), lr=self.lr)
+        return Adam(self.parameters(), lr=self.lr)
 
     # warmup
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure, on_tpu=False, using_native_amp=False, using_lbfgs=False):
