@@ -14,7 +14,6 @@ import torch.nn.functional as F
 
 
 # %%
-
 class CIFARDataModule(pl.LightningDataModule):
     def __init__(self, data_class: str, batch_size = 1024, data_dir: str = "./data"):
         super().__init__()
@@ -88,7 +87,6 @@ class TrainModule(pl.LightningModule):
         preds = torch.argmax(y_hat, dim=1)
         acc = torch.sum(preds == y).item() / len(y)
         self.log('train_acc', acc)
-
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -114,7 +112,8 @@ class TrainModule(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
+#         return torch.optim.Adam(self.parameters(), lr=self.lr)
+        return torch.optim.RMSProp(self.parameters(), lr=self.lr)
 
 
 
@@ -124,37 +123,37 @@ from models import make_efficientnetv2
 
 if __name__ == '__main__':
 
-    cifar = CIFARDataModule(data_class='10')
-    model = make_efficientnetv2('s', num_classes=10)
+    
+    
+    config = {
+        'data' : '100',
+    }
+    
+    
+    
+    cifar = CIFARDataModule(data_class=config['data'])
+    model = make_efficientnetv2('s', num_classes=int(config['data']))
 
-    logger = TensorBoardLogger('tb_logs', name='efficientnetv2-s')
-    checkpoint_callback = ModelCheckpoint(
-        monitor='val_loss',
-        dirpath='checkpoints',
-        filename='efficientnetv2-s-{epoch:02d}-{val_loss:.2f}',
-        save_top_k=3,
-        mode='min',
-    )
+    name = f'efficientnetv2-s CIFAR{config["data"]}'
+    logger = TensorBoardLogger('tb_logs', name=name)
+    
+#     checkpoint_callback = ModelCheckpoint(
+#         monitor='val_loss',
+#         dirpath='checkpoints',
+#         filename='efficientnetv2-s-{epoch:02d}-{val_loss:.2f}',
+#         save_top_k=1,
+#         mode='min',
+#     )
 
     trainer = Trainer(
         gpus=1,
-        max_epochs=100,
+        max_epochs=10,
         logger=logger,
-        callbacks=[checkpoint_callback],
+#         callbacks=[checkpoint_callback],
         # fast_dev_run=True,
     )
 
     train_module = TrainModule(model)
     trainer.fit(train_module, cifar)
     
-    # %%
-
-    train_module = TrainModule(model=model, lr=1e-3)
-    # %%
-
-    trainer = Trainer(gpus=0, max_epochs=10)
-
-    # %%
-    trainer.fit(train_module, cifar)
-    # %%
     trainer.test(train_module, cifar)
