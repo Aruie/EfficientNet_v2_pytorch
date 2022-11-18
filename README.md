@@ -7,3 +7,9 @@
 
 
 ## Copilot 만세
+
+
+
+# train.py 구현
+- 아직 argparser 는 구현안됨
+- config 활용

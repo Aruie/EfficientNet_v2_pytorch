@@ -12,6 +12,9 @@ from torchvision.datasets import MNIST, CIFAR10, CIFAR100
 from torchvision import transforms
 import torch.nn.functional as F
 
+from torch.optim.optimizer import RMSprop, Adam
+
+
 
 # %%
 class CIFARDataModule(pl.LightningDataModule):
@@ -70,10 +73,12 @@ class CIFARDataModule(pl.LightningDataModule):
 
 #%%
 class TrainModule(pl.LightningModule):
-    def __init__(self, model, lr=1e-3):
+    def __init__(self, model, lr=1e-3, warmup = False, **kwargs):
         super().__init__()
         self.model = model
         self.lr = lr
+        self.warmup = warmup
+
 
     def forward(self, x):
         return self.model(x)
@@ -113,7 +118,21 @@ class TrainModule(pl.LightningModule):
 
     def configure_optimizers(self):
 #         return torch.optim.Adam(self.parameters(), lr=self.lr)
-        return torch.optim.RMSProp(self.parameters(), lr=self.lr)
+        return torch.optim.RMSprop(self.parameters(), lr=self.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0.9, centered=False)
+
+    # warmup
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure, on_tpu=False, using_native_amp=False, using_lbfgs=False):
+        # warm up lr
+        if self.warmup:
+            if self.trainer.global_step < 500:
+                lr_scale = min(1., float(self.trainer.global_step + 1) / 500.)
+                for pg in optimizer.param_groups:
+                    pg['lr'] = lr_scale * self.lr
+        # update params
+        optimizer.step(closure=optimizer_closure)
+        # update lr
+        optimizer.zero_grad()
+        self.lr_scheduler.step()
 
 
 
@@ -125,16 +144,17 @@ if __name__ == '__main__':
 
     
     
-    config = {
+    args = {
         'data' : '100',
+        'warmup' : True,
     }
     
     
     
-    cifar = CIFARDataModule(data_class=config['data'])
-    model = make_efficientnetv2('s', num_classes=int(config['data']))
+    cifar = CIFARDataModule(data_class=args['data'])
+    model = make_efficientnetv2('s', num_classes=int(args['data']))
 
-    name = f'efficientnetv2-s CIFAR{config["data"]}'
+    name = f'efficientnetv2-s CIFAR{args["data"]}'
     logger = TensorBoardLogger('tb_logs', name=name)
     
 #     checkpoint_callback = ModelCheckpoint(
@@ -153,7 +173,7 @@ if __name__ == '__main__':
         # fast_dev_run=True,
     )
 
-    train_module = TrainModule(model)
+    train_module = TrainModule(model, warmup=args['warmup'])
     trainer.fit(train_module, cifar)
     
     trainer.test(train_module, cifar)
