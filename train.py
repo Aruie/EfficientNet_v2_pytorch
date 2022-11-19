@@ -87,9 +87,8 @@ class CIFARDataModule(pl.LightningDataModule):
 class TrainModule(pl.LightningModule):
     def __init__(self, **kwargs):
         super().__init__()
-        
-        
-        self.save_hyperparameters(exclude=['verbose'])
+
+        self.save_hyperparameters(ignore=['verbose'])
         print('----------------------------------------')
         print('--- Hyper Parameters -------------------')
         print('----------------------------------------')
