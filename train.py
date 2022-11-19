@@ -85,7 +85,8 @@ class CIFARDataModule(pl.LightningDataModule):
 class TrainModule(pl.LightningModule):
     def __init__(self, **kwargs):
         super().__init__()
-        self.save_hyperparameters(exclude=['verbose'])
+
+        self.save_hyperparameters(ignore=['verbose'])
         print('----------------------------------------')
         print('--- Hyper Parameters -------------------')
         print('----------------------------------------')
@@ -226,7 +227,7 @@ if __name__ == '__main__':
     logger = TensorBoardLogger('tb_logs', name=name)
     trainer = Trainer(
         gpus = 1 if torch.cuda.is_available() else 0,
-        enable_progress_bar = True if dict_args else False,
+        enable_progress_bar = True if dict_args['verbose'] else False,
         max_epochs=dict_args['epoch'],
         callbacks=[lr_monitor],
         logger=logger,
